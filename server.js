@@ -209,22 +209,29 @@ const fpsVideo = await new Promise((resolve) => {
 
 })
 
-const targetFps =
-    fpsVideo > 60
-        ? fpsVideo
-        : 60
+        const targetFps = fpsVideo > 60 ? fpsVideo : 60
 
-if (currentProcess >= MAX_PROCESS) {
-    await new Promise(resolve => {
-        waitingQueue.push(resolve)
-    })
-}
+        const videoId = `vid_${Date.now()}`
+        global.videoProgress[videoId] = { status: "proses", message: "Video diterima! Menunggu antrean server..." }
 
-currentProcess++
+        res.json({
+            status: true,
+            id: videoId,
+            message: "Video diterima server Railway! Memulai render..."
+        });
 
+        if (currentProcess >= MAX_PROCESS) {
+            await new Promise(resolve => {
+                waitingQueue.push(resolve)
+            })
+        }
 
+        currentProcess++
+
+        global.videoProgress[videoId] = { status: "proses", message: "Sedang mengompres video jadi HD..." }
 
         let perintahFfmpeg = "";
+
 
                 if (isImage) {
     perintahFfmpeg = `ffmpeg \
