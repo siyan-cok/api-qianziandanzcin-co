@@ -53,7 +53,23 @@ app.get("/api/progress", (req, res) => {
     if (!id || !global.videoProgress[id]) {
         return res.json({ status: false, progress: 0, message: "ID tidak ditemukan" })
     }
-    res.json(global.videoProgress[id])
+    
+    // JIKA VIDEO SUDAH SELESAI DI-RENDER
+    if (global.videoProgress[id].status === "selesai") {
+        return res.json({
+            status: true,
+            progress: 100, // 👈 Ini yang memicu tombol di web berubah jadi 100% / Sukses
+            message: global.videoProgress[id].message,
+            url: global.videoProgress[id].url
+        })
+    }
+    
+    // JIKA MASIH DALAM PROSES RENDER
+    res.json({
+        status: true,
+        progress: 95, // 👈 Tetap tahan di 95% selama FFmpeg bekerja
+        message: global.videoProgress[id].message
+    })
 })
 
 app.get("/results", (req, res) => {
@@ -86,7 +102,7 @@ const dapatkanDurasiVideo = (filePath) => {
 };
 
 let currentProcess = 0
-const MAX_PROCESS = 1
+const MAX_PROCESS = 2
 const waitingQueue = []
 
 app.post("/upload", upload.single("video"), async (req, res) => {
@@ -370,12 +386,12 @@ console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim o
 }); 
 
     } catch (e) {
-        // Memastikan slot proses dikosongkan kembali jika gagal di tengah jalan
+
         if (currentProcess > 0) {
             currentProcess--;
         }
 
-        // Membuka dan menjalankan antrean berikutnya yang sedang stuck 95%
+
         if (waitingQueue.length > 0) {
             const next = waitingQueue.shift();
             if (typeof next === "function") {
