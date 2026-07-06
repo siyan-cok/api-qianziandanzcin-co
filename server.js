@@ -86,7 +86,7 @@ const dapatkanDurasiVideo = (filePath) => {
 };
 
 let currentProcess = 0
-const MAX_PROCESS = 2
+const MAX_PROCESS = 1
 const waitingQueue = []
 
 app.post("/upload", upload.single("video"), async (req, res) => {
