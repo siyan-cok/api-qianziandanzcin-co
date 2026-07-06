@@ -57,10 +57,18 @@ app.get("/api/progress", (req, res) => {
 })
 
 app.get("/results", (req, res) => {
-    const data = [...global.results]
-    global.results = []
-    res.json(data)
-})
+
+    console.log(
+        "[RESULT GET]",
+        global.results.map(v => v.nomor)
+    );
+
+    const data = [...global.results];
+
+    global.results = [];
+
+    res.json(data);
+});
 
 //jsjsjzjjdjd
 
@@ -345,6 +353,10 @@ ${errorText.slice(-3500)}`
     nomor: nomor,
     time: Date.now()
 });
+
+console.log(
+    `[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`
+);
 
 setTimeout(() => {
     if (fs.existsSync(normalized)) {
