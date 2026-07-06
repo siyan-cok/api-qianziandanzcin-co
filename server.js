@@ -51,26 +51,27 @@ app.get("/", (req, res) => {
 app.get("/api/progress", (req, res) => {
     const id = req.query.id
     if (!id || !global.videoProgress[id]) {
-        return res.json({ status: false, progress: 0, message: "ID tidak ditemukan" })
+        return res.json({ status: "error", progress: 0, message: "ID tidak ditemukan" })
     }
     
-    // JIKA VIDEO SUDAH SELESAI DI-RENDER
+
     if (global.videoProgress[id].status === "selesai") {
         return res.json({
-            status: true,
-            progress: 100, // 👈 Ini yang memicu tombol di web berubah jadi 100% / Sukses
+            status: "selesai", 
+            progress: 100,
             message: global.videoProgress[id].message,
             url: global.videoProgress[id].url
         })
     }
     
-    // JIKA MASIH DALAM PROSES RENDER
+
     res.json({
-        status: true,
-        progress: 95, // 👈 Tetap tahan di 95% selama FFmpeg bekerja
+        status: "proses", 
+        progress: 95,
         message: global.videoProgress[id].message
     })
 })
+
 
 app.get("/results", (req, res) => {
 
