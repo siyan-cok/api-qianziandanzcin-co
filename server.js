@@ -214,24 +214,15 @@ const targetFps =
         ? fpsVideo
         : 60
 
-        const videoId = `vid_${Date.now()}`
-        global.videoProgress[videoId] = { status: "proses", message: "Video diterima! Menunggu antrean server..." }
+if (currentProcess >= MAX_PROCESS) {
+    await new Promise(resolve => {
+        waitingQueue.push(resolve)
+    })
+}
 
-        res.json({
-            status: true,
-            id: videoId,
-            message: "Video diterima server Railway! Memulai render..."
-        });
+currentProcess++
 
-        if (currentProcess >= MAX_PROCESS) {
-            await new Promise(resolve => {
-                waitingQueue.push(resolve)
-            })
-        }
 
-        currentProcess++
-
-        global.videoProgress[videoId] = { status: "proses", message: "Sedang mengompres video jadi HD..." }
 
         let perintahFfmpeg = "";
 
@@ -266,6 +257,18 @@ const targetFps =
 -movflags +faststart \
 "${normalized}"`
 }
+
+        const videoId = `vid_${Date.now()}`
+        global.videoProgress[videoId] = { status: "proses", message: "Sedang mengompres video jadi HD..." }
+
+
+        res.json({
+            status: true,
+            id: videoId,
+            message: "Video diterima server Railway! Memulai render..."
+        });
+
+
         exec(
     perintahFfmpeg,
     { maxBuffer: 1024 * 1024 * 100 },
