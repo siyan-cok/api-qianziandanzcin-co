@@ -209,7 +209,10 @@ const fpsVideo = await new Promise((resolve) => {
 
 })
 
-        const targetFps = fpsVideo > 60 ? fpsVideo : 60
+const targetFps =
+    fpsVideo > 60
+        ? fpsVideo
+        : 60
 
         const videoId = `vid_${Date.now()}`
         global.videoProgress[videoId] = { status: "proses", message: "Video diterima! Menunggu antrean server..." }
@@ -231,7 +234,6 @@ const fpsVideo = await new Promise((resolve) => {
         global.videoProgress[videoId] = { status: "proses", message: "Sedang mengompres video jadi HD..." }
 
         let perintahFfmpeg = "";
-
 
                 if (isImage) {
     perintahFfmpeg = `ffmpeg \
@@ -264,18 +266,6 @@ const fpsVideo = await new Promise((resolve) => {
 -movflags +faststart \
 "${normalized}"`
 }
-
-        const videoId = `vid_${Date.now()}`
-        global.videoProgress[videoId] = { status: "proses", message: "Sedang mengompres video jadi HD..." }
-
-
-        res.json({
-            status: true,
-            id: videoId,
-            message: "Video diterima server Railway! Memulai render..."
-        });
-
-
         exec(
     perintahFfmpeg,
     { maxBuffer: 1024 * 1024 * 100 },
