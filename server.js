@@ -86,7 +86,7 @@ const dapatkanDurasiVideo = (filePath) => {
 };
 
 let currentProcess = 0
-const MAX_PROCESS = 1
+const MAX_PROCESS = 2
 const waitingQueue = []
 
 app.post("/upload", upload.single("video"), async (req, res) => {
@@ -370,12 +370,12 @@ console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim o
 }); 
 
     } catch (e) {
-
+        // Memastikan slot proses dikosongkan kembali jika gagal di tengah jalan
         if (currentProcess > 0) {
             currentProcess--;
         }
 
-
+        // Membuka dan menjalankan antrean berikutnya yang sedang stuck 95%
         if (waitingQueue.length > 0) {
             const next = waitingQueue.shift();
             if (typeof next === "function") {
@@ -392,7 +392,7 @@ console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim o
                 error: "Gagal memproses HD video: " + e.message
             });
         }
-    }
+    
         
         console.log("[DanzClean Catch Error]:", e.message)
         if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path)
