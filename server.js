@@ -49,24 +49,35 @@ app.get("/", (req, res) => {
 
 
 app.get("/api/progress", (req, res) => {
+
+    res.set({
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "Surrogate-Control": "no-store"
+    })
+
     const id = req.query.id
+
     if (!id || !global.videoProgress[id]) {
-        return res.json({ status: "error", progress: 0, message: "ID tidak ditemukan" })
+        return res.json({
+            status: "error",
+            progress: 0,
+            message: "ID tidak ditemukan"
+        })
     }
-    
 
     if (global.videoProgress[id].status === "selesai") {
         return res.json({
-            status: "selesai", 
+            status: "selesai",
             progress: 100,
             message: global.videoProgress[id].message,
             url: global.videoProgress[id].url
         })
     }
-    
 
     res.json({
-        status: "proses", 
+        status: "proses",
         progress: 95,
         message: global.videoProgress[id].message
     })
