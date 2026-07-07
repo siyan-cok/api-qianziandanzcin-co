@@ -427,7 +427,15 @@ console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim o
 app.use((err, req, res, next) => {
     res.status(500).json({ status: false, error: "Internal Server Error" })
 })
-
+setInterval(() => {
+    console.log("[DEBUG]", {
+        currentProcess,
+        waitingQueue: waitingQueue.length,
+        results: global.results.length,
+        memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        uptime: Math.round(process.uptime()) + "s"
+    })
+}, 10000)
 app.listen(process.env.PORT || 3000, () => {
     console.log("API READY")
 })
