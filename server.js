@@ -49,35 +49,24 @@ app.get("/", (req, res) => {
 
 
 app.get("/api/progress", (req, res) => {
-
-    res.set({
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Surrogate-Control": "no-store"
-    })
-
     const id = req.query.id
-
     if (!id || !global.videoProgress[id]) {
-        return res.json({
-            status: "error",
-            progress: 0,
-            message: "ID tidak ditemukan"
-        })
+        return res.json({ status: "error", progress: 0, message: "ID tidak ditemukan" })
     }
+    
 
     if (global.videoProgress[id].status === "selesai") {
         return res.json({
-            status: "selesai",
+            status: "selesai", 
             progress: 100,
             message: global.videoProgress[id].message,
             url: global.videoProgress[id].url
         })
     }
+    
 
     res.json({
-        status: "proses",
+        status: "proses", 
         progress: 95,
         message: global.videoProgress[id].message
     })
@@ -93,15 +82,9 @@ app.get("/results", (req, res) => {
 
     const data = [...global.results];
 
-console.log("[RESULT SEND]", data.length);
+    global.results = [];
 
-if (data.length > 0) {
-    console.log("[RESULT NOMOR]", data.map(v => v.nomor));
-}
-
-global.results = [];
-
-res.json(data);
+    res.json(data);
 });
 
 //jsjsjzjjdjd
@@ -256,13 +239,15 @@ const targetFps =
         ? fpsVideo
         : 60
 
-if (currentProcess >= MAX_PROCESS) {
-    await new Promise(resolve => {
-        waitingQueue.push(resolve)
-    })
-}
 
-currentProcess++
+if (!isImage) {
+    if (currentProcess >= MAX_PROCESS) {
+        await new Promise(resolve => {
+            waitingQueue.push(resolve)
+        })
+    }
+    currentProcess++
+}
 
 
 
@@ -275,23 +260,24 @@ currentProcess++
 -q:v 1 \
 "${normalized}"`;
 } else {
-    perintahFfmpeg = `ffmpeg \
+    
+perintahFfmpeg = `ffmpeg \
 -err_detect ignore_err \
 -fflags +discardcorrupt \
--analyzeduration 100M \
--probesize 100M \
+-analyzeduration 50M \
+-probesize 50M \
 -i "${file.path}" \
--vf "scale='if(gte(iw,ih),-2,720)':'if(gte(iw,ih),720,-2)',hqdn3d=1.0:1.0:2.0:2.0,unsharp=3:3:0.4:3:3:0.4" \
+-vf "scale='if(gte(iw,ih),-2,720)':'if(gte(iw,ih),720,-2)',unsharp=3:3:0.4:3:3:0.4" \
 -r ${targetFps} \
 -c:v libx264 \
--preset faster \
--crf 17 \
+-preset superfast \
+-crf 18 \
 -aq-mode 3 \
 -colorspace bt709 \
 -color_trc bt709 \
 -color_primaries bt709 \
--maxrate 12M \
--bufsize 12M \
+-maxrate 8M \
+-bufsize 8M \
 -pix_fmt yuv420p \
 -threads 2 \
 -c:a aac \
@@ -311,82 +297,80 @@ currentProcess++
         });
 
 
-        exec(
+
+const prosesFfmpeg = exec(
     perintahFfmpeg,
     { maxBuffer: 1024 * 1024 * 100 },
     (err, stdout, stderr) => {
-            currentProcess--;
+            
+            
+            if (!isImage) {
+                currentProcess--;
 
-            if (waitingQueue.length > 0) {
-                const next = waitingQueue.shift();
-                next();
+                if (waitingQueue.length > 0) {
+                    const next = waitingQueue.shift();
+                    next();
+                }
             }
 
             if (fs.existsSync(file.path)) {
                 fs.unlinkSync(file.path);
             }
-const ffmpegLog = String(stderr || "")
+            
+            const ffmpegLog = String(stderr || "")
+            const sukses = fs.existsSync(normalized) && fs.statSync(normalized).size > 500 * 1024
 
-const sukses =
-    fs.existsSync(normalized) &&
-    fs.statSync(normalized).size > 500 * 1024
+            if (err && !sukses) {
+                const errorText = String(stderr || err.message || err)
+                global.videoProgress[videoId] = {
+                    status: "error",
+                    message: "Video tidak dapat diproses oleh server."
+                }
 
-if (err && !sukses) {
-
-    const errorText =
-        String(stderr || err.message || err)
-
-    global.videoProgress[videoId] = {
-        status: "error",
-        message: "Video tidak dapat diproses oleh server."
-    }
-
-    sendTelegram(
-`âŒ DanzClean Error
-
-Nomor:
-${nomor}
-
-File:
-${file.originalname}
-
-Ukuran:
-${(file.size / 1024 / 1024).toFixed(2)} MB
-
-Durasi:
-${durasiVideo}s
-
-FPS Asli:
-${fpsVideo}
-
-Target FPS:
-${targetFps}
-
-Bitrate:
-${targetBitrateKbps}
-
-Error:
-
-${errorText.slice(-3500)}`
-    )
-
-    return
-}
-
+                sendTelegram(
+`❌ DanzClean Error
+Nomor: ${nomor}
+File: ${file.originalname}
+Ukuran: ${(file.size / 1024 / 1024).toFixed(2)} MB
+Durasi: ${durasiVideo}s
+FPS Asli: ${fpsVideo}
+Target FPS: ${targetFps}
+Bitrate: ${targetBitrateKbps}
+Error: ${errorText.slice(-3500)}`
+                )
+                return
+            }
 
             const domainPenyedia = req.get("host");
             const protocolPenyedia = req.protocol;
             const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
 
-            
             global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl }
 
-            
             global.results.push({
-    url: resultUrl,
-    nomor: nomor,
-    time: Date.now()
-});
+                url: resultUrl,
+                nomor: nomor,
+                time: Date.now()
+            });
+
+            console.log(`[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`);
+
+            setTimeout(() => {
+                if (fs.existsSync(normalized)) {
+                    fs.unlink(normalized, () => {});
+                    console.log(`[AUTO DELETE] ${outputFilename}`);
+                }
+            }, 5 * 60 * 1000); 
+
+            console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim oleh main.js!`);
+    }
+); 
+setTimeout(() => {
+    if (!prosesFfmpeg.killed && global.videoProgress[videoId]?.status === "proses") {
+        console.log(`[TIMEOUT AUTO-KILL] Proses ${videoId} dipaksa berhenti karena gantung.`);
+        prosesFfmpeg.kill('SIGKILL');
+    }
+}, 5 * 60 * 1000); 
 
 console.log(
     `[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`
@@ -444,15 +428,7 @@ console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim o
 app.use((err, req, res, next) => {
     res.status(500).json({ status: false, error: "Internal Server Error" })
 })
-setInterval(() => {
-    console.log("[DEBUG]", {
-        currentProcess,
-        waitingQueue: waitingQueue.length,
-        results: global.results.length,
-        memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
-        uptime: Math.round(process.uptime()) + "s"
-    })
-}, 10000)
+
 app.listen(process.env.PORT || 3000, () => {
     console.log("API READY")
 })
