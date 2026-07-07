@@ -82,9 +82,15 @@ app.get("/results", (req, res) => {
 
     const data = [...global.results];
 
-    global.results = [];
+console.log("[RESULT SEND]", data.length);
 
-    res.json(data);
+if (data.length > 0) {
+    console.log("[RESULT NOMOR]", data.map(v => v.nomor));
+}
+
+global.results = [];
+
+res.json(data);
 });
 
 //jsjsjzjjdjd
