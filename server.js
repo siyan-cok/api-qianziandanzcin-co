@@ -94,7 +94,14 @@ app.get("/results", (req, res) => {
 });
 
 //jsjsjzjjdjd
-
+app.get("/debug", (req, res) => {
+    res.json({
+        currentProcess,
+        waitingQueue: waitingQueue.length,
+        progressCount: Object.keys(global.videoProgress).length,
+        resultCount: global.results.length
+    })
+})
 //=======
 const dapatkanDurasiVideo = (filePath) => {
 
