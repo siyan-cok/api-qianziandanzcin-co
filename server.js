@@ -103,7 +103,7 @@ const dapatkanDurasiVideo = (filePath) => {
 };
 
 let currentProcess = 0
-const MAX_PROCESS = 2
+const MAX_PROCESS = 1
 const waitingQueue = []
 
 app.post("/upload", upload.single("video"), async (req, res) => {
@@ -297,95 +297,105 @@ perintahFfmpeg = `ffmpeg \
         });
 
 
+                
+        const prosesFfmpeg = exec(
+            perintahFfmpeg,
+            { maxBuffer: 1024 * 1024 * 100 },
+            (err, stdout, stderr) => {
 
-const prosesFfmpeg = exec(
-    perintahFfmpeg,
-    { maxBuffer: 1024 * 1024 * 100 },
-    (err, stdout, stderr) => {
-            
-            
-            if (!isImage) {
-                currentProcess--;
+                    if (!isImage) {
+                        currentProcess--;
 
-                if (waitingQueue.length > 0) {
-                    const next = waitingQueue.shift();
-                    next();
-                }
-            }
+                        if (waitingQueue.length > 0) {
+                            const next = waitingQueue.shift();
+                            next();
+                        }
+                    }
 
-            if (fs.existsSync(file.path)) {
-                fs.unlinkSync(file.path);
-            }
-            
-            const ffmpegLog = String(stderr || "")
-            const sukses = fs.existsSync(normalized) && fs.statSync(normalized).size > 500 * 1024
+                    if (fs.existsSync(file.path)) {
+                        fs.unlinkSync(file.path);
+                    }
+                    const ffmpegLog = String(stderr || "")
 
-            if (err && !sukses) {
-                const errorText = String(stderr || err.message || err)
-                global.videoProgress[videoId] = {
-                    status: "error",
-                    message: "Video tidak dapat diproses oleh server."
-                }
+                    const sukses =
+                        fs.existsSync(normalized) &&
+                        fs.statSync(normalized).size > 500 * 1024
 
-                sendTelegram(
+                    if (err && !sukses) {
+
+                        const errorText =
+                            String(stderr || err.message || err)
+
+                        global.videoProgress[videoId] = {
+                            status: "error",
+                            message: "Video tidak dapat diproses oleh server."
+                        }
+
+                        sendTelegram(
 `❌ DanzClean Error
-Nomor: ${nomor}
-File: ${file.originalname}
-Ukuran: ${(file.size / 1024 / 1024).toFixed(2)} MB
-Durasi: ${durasiVideo}s
-FPS Asli: ${fpsVideo}
-Target FPS: ${targetFps}
-Bitrate: ${targetBitrateKbps}
-Error: ${errorText.slice(-3500)}`
-                )
-                return
+
+Nomor:
+${nomor}
+
+File:
+${file.originalname}
+
+Ukuran:
+${(file.size / 1024 / 1024).toFixed(2)} MB
+
+Durasi:
+${durasiVideo}s
+
+FPS Asli:
+${fpsVideo}
+
+Target FPS:
+${targetFps}
+
+Bitrate:
+${targetBitrateKbps}
+
+Error:
+
+${errorText.slice(-3500)}`
+                        )
+
+                        return
+                    }
+
+                    const domainPenyedia = req.get("host");
+                    const protocolPenyedia = req.protocol;
+                    const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
+
+                    global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl }
+
+                    global.results.push({
+                        url: resultUrl,
+                        nomor: nomor,
+                        time: Date.now()
+                    });
+
+                    console.log(
+                        `[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`
+                    );
+
+                    setTimeout(() => {
+                        if (fs.existsSync(normalized)) {
+                            fs.unlink(normalized, () => {});
+                            console.log(`[AUTO DELETE] ${outputFilename}`);
+                        }
+                    }, 5 * 60 * 1000); 
+
+                    console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim oleh main.js!`);
             }
+        ); 
+        setTimeout(() => {
+            if (prosesFfmpeg && !prosesFfmpeg.killed && global.videoProgress[videoId]?.status === "proses") {
+                console.log(`[TIMEOUT AUTO-KILL] Proses ${videoId} dipaksa berhenti karena gantung.`);
+                prosesFfmpeg.kill('SIGKILL');
+            }
+        }, 5 * 60 * 1000);
 
-            const domainPenyedia = req.get("host");
-            const protocolPenyedia = req.protocol;
-            const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
-
-            global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl }
-
-            global.results.push({
-                url: resultUrl,
-                nomor: nomor,
-                time: Date.now()
-            });
-
-            console.log(`[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`);
-
-            setTimeout(() => {
-                if (fs.existsSync(normalized)) {
-                    fs.unlink(normalized, () => {});
-                    console.log(`[AUTO DELETE] ${outputFilename}`);
-                }
-            }, 5 * 60 * 1000); 
-
-            console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim oleh main.js!`);
-    }
-); 
-setTimeout(() => {
-    if (!prosesFfmpeg.killed && global.videoProgress[videoId]?.status === "proses") {
-        console.log(`[TIMEOUT AUTO-KILL] Proses ${videoId} dipaksa berhenti karena gantung.`);
-        prosesFfmpeg.kill('SIGKILL');
-    }
-}, 5 * 60 * 1000); 
-
-console.log(
-    `[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`
-);
-
-setTimeout(() => {
-    if (fs.existsSync(normalized)) {
-        fs.unlink(normalized, () => {});
-        console.log(`[AUTO DELETE] ${outputFilename}`);
-    }
-}, 5 * 60 * 1000); 
-
-console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim oleh main.js!`);
-
-}); 
 
     } catch (e) {
 
