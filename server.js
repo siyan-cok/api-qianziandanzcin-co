@@ -335,118 +335,61 @@ perintahFfmpeg = `ffmpeg \
 
 
                 
-        const prosesFfmpeg = exec(
-            perintahFfmpeg,
-            { maxBuffer: 1024 * 1024 * 100 },
-            (err, stdout, stderr) => {
+        const eksekusiFfmpeg = () => {
+            return new Promise((resolve) => {
+                const prosesFfmpeg = exec(
+                    perintahFfmpeg,
+                    { maxBuffer: 1024 * 1024 * 100 },
+                    (err, stdout, stderr) => {
+                        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
-                    if (!isImage) {
-                        currentProcess--;
+                        const sukses = fs.existsSync(normalized) && fs.statSync(normalized).size > 500 * 1024;
 
-                        if (waitingQueue.length > 0) {
-                            const next = waitingQueue.shift();
-                            next();
-                        }
-                    }
+                        if (err && !sukses) {
+                            const errorText = String(stderr || err.message || err);
+                            global.videoProgress[videoId] = {
+                                status: "error",
+                                message: "Video tidak dapat diproses oleh server."
+                            };
 
-                    if (fs.existsSync(file.path)) {
-                        fs.unlinkSync(file.path);
-                    }
-                    const ffmpegLog = String(stderr || "")
-
-                    const sukses =
-                        fs.existsSync(normalized) &&
-                        fs.statSync(normalized).size > 500 * 1024
-
-                    if (err && !sukses) {
-
-                        const errorText =
-                            String(stderr || err.message || err)
-
-                        global.videoProgress[videoId] = {
-                            status: "error",
-                            message: "Video tidak dapat diproses oleh server."
+                            sendTelegram(`❌ DanzClean Error\n\nNomor: ${nomor}\nFile: ${file.originalname}\nError:\n${errorText.slice(-1000)}`);
+                            return resolve();
                         }
 
-                        sendTelegram(
-`❌ DanzClean Error
+                        const domainPenyedia = req.get("host");
+                        const protocolPenyedia = req.protocol;
+                        const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
 
-Nomor:
-${nomor}
+                        global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl };
 
-File:
-${file.originalname}
+                        global.results.push({
+                            url: resultUrl,
+                            nomor: nomor,
+                            time: Date.now()
+                        });
 
-Ukuran:
-${(file.size / 1024 / 1024).toFixed(2)} MB
+                        setTimeout(() => {
+                            if (fs.existsSync(normalized)) fs.unlink(normalized, () => {});
+                        }, 5 * 60 * 1000);
 
-Durasi:
-${durasiVideo}s
-
-FPS Asli:
-${fpsVideo}
-
-Target FPS:
-${targetFps}
-
-Bitrate:
-${targetBitrateKbps}
-
-Error:
-
-${errorText.slice(-3500)}`
-                        )
-
-                        return
+                        resolve();
                     }
+                );
 
-                    const domainPenyedia = req.get("host");
-                    const protocolPenyedia = req.protocol;
-                    const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
+                setTimeout(() => {
+                    if (prosesFfmpeg && !prosesFfmpeg.killed && global.videoProgress[videoId]?.status === "proses") {
+                        prosesFfmpeg.kill('SIGKILL');
+                        resolve();
+                    }
+                }, 5 * 60 * 1000);
+            });
+        };
 
-                    global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl }
-
-                    global.results.push({
-                        url: resultUrl,
-                        nomor: nomor,
-                        time: Date.now()
-                    });
-
-                    console.log(
-                        `[RESULT PUSH] ${nomor} | TOTAL: ${global.results.length}`
-                    );
-
-                    setTimeout(() => {
-                        if (fs.existsSync(normalized)) {
-                            fs.unlink(normalized, () => {});
-                            console.log(`[AUTO DELETE] ${outputFilename}`);
-                        }
-                    }, 5 * 60 * 1000); 
-
-                    console.log(`[DanzClean Sukses]: Video ${outputFilename} matang & siap dikirim oleh main.js!`);
-            }
-        ); 
-        setTimeout(() => {
-            if (prosesFfmpeg && !prosesFfmpeg.killed && global.videoProgress[videoId]?.status === "proses") {
-                console.log(`[TIMEOUT AUTO-KILL] Proses ${videoId} dipaksa berhenti karena gantung.`);
-                prosesFfmpeg.kill('SIGKILL');
-            }
-        }, 5 * 60 * 1000);
+        waitingQueue.push({ videoId, eksekusiFfmpeg });
+        prosesAntreanBerikutnya();
 
 
     } catch (e) {
-
-        if (currentProcess > 0) {
-            currentProcess--;
-        }
-
-
-        if (waitingQueue.length > 0) {
-            const next = waitingQueue.shift();
-            if (typeof next === "function") {
-                next(); 
-            }
-        }
         
         console.log("[DanzClean Catch Error]:", e.message);
         if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path);
