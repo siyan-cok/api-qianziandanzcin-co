@@ -61,19 +61,31 @@ app.get("/api/progress", (req, res) => {
         return res.json({ status: "error", progress: 0, message: "ID tidak ditemukan" })
     }
     
-    if (global.videoProgress[id].status === "selesai") {
+    const dataProgress = global.videoProgress[id];
+
+    if (dataProgress.status === "selesai") {
         return res.json({
             status: "selesai", 
             progress: 100,
-            message: global.videoProgress[id].message,
-            url: global.videoProgress[id].url
+            message: dataProgress.message,
+            url: dataProgress.url
         })
     }
     
+
+    if (dataProgress.status === "antre") {
+        return res.json({
+            status: "proses", 
+            progress: 25, 
+            message: "Sedang menganalisis struktur video..."
+        })
+    }
+    
+
     res.json({
         status: "proses", 
-        progress: 95,
-        message: global.videoProgress[id].message
+        progress: 75,
+        message: "Sedang merender video ke kualitas HD..."
     })
 })
 
@@ -94,9 +106,32 @@ app.get("/results", (req, res) => {
 });
 
 //jsjsjzjjdjd
+const waitingQueue = [];
+let isProcessing = false;
+
+async function prosesAntreanBerikutnya() {
+    if (isProcessing || waitingQueue.length === 0) return;
+
+    isProcessing = true;
+    const tugas = waitingQueue.shift();
+
+    try {
+        global.videoProgress[tugas.videoId] = { 
+            status: "proses", 
+            message: "Memulai proses rendering FFmpeg..." 
+        };
+        await tugas.eksekusiFfmpeg();
+    } catch (err) {
+        console.error("[Antrean Error]", err);
+    } finally {
+        isProcessing = false;
+        prosesAntreanBerikutnya();
+    }
+}
+
 app.get("/debug", (req, res) => {
     res.json({
-        currentProcess,
+        isProcessing,
         waitingQueue: waitingQueue.length,
         progressCount: Object.keys(global.videoProgress).length,
         resultCount: global.results.length
@@ -114,10 +149,6 @@ const dapatkanDurasiVideo = (filePath) => {
         });
     });
 };
-
-let currentProcess = 0
-const MAX_PROCESS = 1
-const waitingQueue = []
 
 app.post("/upload", upload.single("video"), async (req, res) => {
     const authHeader = req.headers.authorization;
@@ -253,16 +284,6 @@ const targetFps =
         : 60
 
 
-if (!isImage) {
-    if (currentProcess >= MAX_PROCESS) {
-        await new Promise(resolve => {
-            waitingQueue.push(resolve)
-        })
-    }
-    currentProcess++
-}
-
-
 
         let perintahFfmpeg = "";
 
@@ -300,8 +321,11 @@ perintahFfmpeg = `ffmpeg \
 }
 
         const videoId = `vid_${Date.now()}`
-        global.videoProgress[videoId] = { status: "proses", message: "Sedang mengompres video jadi HD..." }
 
+        global.videoProgress[videoId] = { 
+            status: "antre", 
+            message: "Sedang mengompres video jadi HD..." 
+        };
 
         res.json({
             status: true,
