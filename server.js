@@ -38,7 +38,11 @@ if (!fs.existsSync("public")) fs.mkdirSync("public");
 
 app.use("/video", express.static(path.join(__dirname, "public")))
 
-const upload = multer({ dest: "uploads/" })
+
+const upload = multer({ 
+    dest: "uploads/",
+    limits: { fileSize: 250 * 1024 * 1024 } 
+})
 
 global.results = []
 global.videoProgress = {} 
@@ -305,7 +309,7 @@ perintahFfmpeg = `ffmpeg \
 -r ${targetFps} \
 -c:v libx264 \
 -preset superfast \
--crf 18 \
+-crf 17 \
 -aq-mode 3 \
 -colorspace bt709 \
 -color_trc bt709 \
@@ -339,7 +343,7 @@ perintahFfmpeg = `ffmpeg \
             return new Promise((resolve) => {
                 const prosesFfmpeg = exec(
                     perintahFfmpeg,
-                    { maxBuffer: 1024 * 1024 * 100 },
+                    { maxBuffer: 1024 * 1024 * 1024 }, 
                     (err, stdout, stderr) => {
                         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
@@ -416,6 +420,12 @@ perintahFfmpeg = `ffmpeg \
 })
 
 app.use((err, req, res, next) => {
+    if (err && err.code === "LIMIT_FILE_SIZE") {
+        return res.json({
+            status: false,
+            error: "Ukuran file terlalu besar! Maksimal ukuran yang diizinkan adalah 250 MB."
+        })
+    }
     res.status(500).json({ status: false, error: "Internal Server Error" })
 })
 
