@@ -6,6 +6,53 @@ const axios = require("axios")
 const { exec } = require("child_process")
 const path = require("path")
 const FormData = require("form-data")
+
+
+const API_USER = "1486660369";
+const API_SECRET = "sWi95Xh3jNGWaKYXBsnBpLHXGZY2Jmcb";
+
+
+async function detectNSFW(filePath) {
+    try {
+        const form = new FormData();
+        form.append("media", fs.createReadStream(filePath));
+        form.append("models", "nudity-2.1");
+        form.append("api_user", API_USER);
+        form.append("api_secret", API_SECRET);
+
+        const { data } = await axios.post(
+            "https://api.sightengine.com/1.0/check.json",
+            form,
+            {
+                headers: form.getHeaders(),
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity
+            }
+        );
+
+        if (data.status !== "success") {
+            throw new Error("Sightengine API gagal merespons.");
+        }
+
+        const n = data.nudity || {};
+        const sexualActivity = Number(n.sexual_activity || 0);
+        const sexualDisplay = Number(n.sexual_display || 0);
+        const erotica = Number(n.erotica || 0);
+        const verySuggestive = Number(n.very_suggestive || 0);
+
+        const blocked =
+            sexualActivity >= 0.30 ||
+            sexualDisplay >= 0.40 ||
+            erotica >= 0.40 ||
+            verySuggestive >= 0.90;
+
+        return { blocked };
+    } catch (err) {
+        console.log("[NSFW CHECK ERROR]:", err.message);
+        return { blocked: false }; 
+    }
+}
+
 async function sendTelegram(text) {
     try {
         await axios.post(
@@ -22,39 +69,6 @@ async function sendTelegram(text) {
         console.log("[TELEGRAM ERROR]", e.message)
     }
 }
-
-// ==========================================
-// FUNGSI CEK PORNO / NSFW (SIGHTENGINE AI)
-// ==========================================
-async function cekKontenPorno(imagePath) {
-    try {
-        const formData = new FormData();
-        formData.append('media', fs.createReadStream(imagePath));
-        formData.append('models', 'nudity-2.0');
-        
-
-        formData.append('api_user', '1486660369');
-        formData.append('api_secret', 'sWi95Xh3jNGWaKYXBsnBpLHXGZY2Jmcb');
-
-        const response = await axios.post('https://api.sightengine.com/1.0/check.json', formData, {
-            headers: formData.getHeaders(),
-            timeout: 10000
-        });
-
-        if (response.data && response.data.status === 'success') {
-            const nudity = response.data.nudity;
-            
-            if (nudity.sexual_activity > 0.5 || nudity.sexual_display > 0.5 || nudity.erotica > 0.5) {
-                return true; 
-            }
-        }
-        return false; 
-    } catch (error) {
-        console.log("[NSFW Filter Error]", error.message);
-        return false; 
-    }
-}
-
 const app = express()
 
 app.use(cors({
@@ -264,7 +278,6 @@ if (!members.includes(nomor)) {
 }
 
         const ext = file.originalname.split(".").pop().toLowerCase()
-
         const allow = ["mp4", "mov", "mkv", "avi", "webm", "m4v", "jpg", "jpeg", "png"]
 
         if (!allow.includes(ext)) {
@@ -272,9 +285,24 @@ if (!members.includes(nomor)) {
             return res.json({ status: false, error: "Hanya file video atau foto (JPG/PNG)" })
         }
 
-
         const isImage = ["jpg", "jpeg", "png"].includes(ext);
+
+        if (isImage) {
+            const nsfwCheck = await detectNSFW(file.path);
+            if (nsfwCheck.blocked) {
+                fs.unlinkSync(file.path); 
+                sendTelegram(`🚫 *Deteksi Konten NSFW Ditolak!*\n\nNomor: ${nomor}\nNama File: ${file.originalname}\nStatus: Terdeteksi foto tidak senonoh.`);
+                
+                return res.json({
+                    status: false,
+                    error: "Foto ditolak! Sistem mendeteksi adanya konten pornografi atau tidak pantas."
+                });
+            }
+        }
+
+
         const outputFilename = `${Date.now()}_HD_DanzClean.${isImage ? ext : 'mp4'}`
+
         const normalized = path.join(__dirname, "public", outputFilename)
         
         const durasiVideo = await dapatkanDurasiVideo(file.path);
