@@ -22,6 +22,39 @@ async function sendTelegram(text) {
         console.log("[TELEGRAM ERROR]", e.message)
     }
 }
+
+// ==========================================
+// FUNGSI CEK PORNO / NSFW (SIGHTENGINE AI)
+// ==========================================
+async function cekKontenPorno(imagePath) {
+    try {
+        const formData = new FormData();
+        formData.append('media', fs.createReadStream(imagePath));
+        formData.append('models', 'nudity-2.0');
+        
+
+        formData.append('api_user', '1486660369');
+        formData.append('api_secret', 'sWi95Xh3jNGWaKYXBsnBpLHXGZY2Jmcb');
+
+        const response = await axios.post('https://api.sightengine.com/1.0/check.json', formData, {
+            headers: formData.getHeaders(),
+            timeout: 10000
+        });
+
+        if (response.data && response.data.status === 'success') {
+            const nudity = response.data.nudity;
+            
+            if (nudity.sexual_activity > 0.5 || nudity.sexual_display > 0.5 || nudity.erotica > 0.5) {
+                return true; 
+            }
+        }
+        return false; 
+    } catch (error) {
+        console.log("[NSFW Filter Error]", error.message);
+        return false; 
+    }
+}
+
 const app = express()
 
 app.use(cors({
