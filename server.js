@@ -386,13 +386,13 @@ perintahFfmpeg = `ffmpeg \
 -r ${targetFps} \
 -c:v libx264 \
 -preset superfast \
--crf 17 \
+-crf 15 \
 -aq-mode 3 \
 -colorspace bt709 \
 -color_trc bt709 \
 -color_primaries bt709 \
--maxrate 8M \
--bufsize 8M \
+-maxrate 12M \
+-bufsize 12M \
 -pix_fmt yuv420p \
 -threads 2 \
 -c:a aac \
