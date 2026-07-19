@@ -352,20 +352,21 @@ const targetFps =
 
         let perintahFfmpeg = "";
 
-        if (isImage) {
-            perintahFfmpeg = `ffmpeg \
+                if (isImage) {
+    perintahFfmpeg = `ffmpeg \
 -i "${file.path}" \
 -vf "scale='if(gte(iw,ih),-2,2160)':'if(gte(iw,ih),2160,-2)',unsharp=7:7:1.2:7:7:1.2,eq=contrast=1.06:saturation=1.15:brightness=0.01" \
 -q:v 1 \
 "${normalized}"`;
-        } else {
-            perintahFfmpeg = `ffmpeg \
+} else {
+    
+perintahFfmpeg = `ffmpeg \
 -err_detect ignore_err \
 -fflags +discardcorrupt \
 -analyzeduration 50M \
 -probesize 50M \
 -i "${file.path}" \
--vf "scale='if(gte(iw,ih),-2,1080)':'if(gte(iw,ih),1080,-2)',unsharp=3:3:0.4:3:3:0.4" \
+-vf "scale='if(gte(iw,ih),-2,720)':'if(gte(iw,ih),720,-2)',unsharp=3:3:0.4:3:3:0.4" \
 -r ${targetFps} \
 -c:v libx264 \
 -preset superfast \
@@ -381,8 +382,8 @@ const targetFps =
 -c:a aac \
 -b:a 128k \
 -movflags +faststart \
-"${normalized}"`;
-        }
+"${normalized}"`
+}
 
         const videoId = `vid_${Date.now()}`
 
@@ -407,56 +408,36 @@ const targetFps =
                     (err, stdout, stderr) => {
                         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
-                        // Pengecekan ukuran sukses disesuaikan: Foto (> 5KB) atau Video (> 500KB)
-                        const sukses = fs.existsSync(normalized) && (isImage ? fs.statSync(normalized).size > 5 * 1024 : fs.statSync(normalized).size > 500 * 1024);
+                        const sukses = fs.existsSync(normalized) && fs.statSync(normalized).size > 500 * 1024;
 
                         if (err && !sukses) {
                             const errorText = String(stderr || err.message || err);
                             global.videoProgress[videoId] = {
                                 status: "error",
-                                message: "Media tidak dapat diproses oleh server."
+                                message: "Video tidak dapat diproses oleh server."
                             };
 
                             sendTelegram(`❌ DanzClean Error\n\nNomor: ${nomor}\nFile: ${file.originalname}\nError:\n${errorText.slice(-1000)}`);
                             return resolve();
                         }
 
-                        
-                        exec(`ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${normalized}"`, (probeErr, probeStdout) => {
-                            let mediaWidth = isImage ? 2160 : 720;  
-                            let mediaHeight = isImage ? 3840 : 1280;
+                        const domainPenyedia = req.get("host");
+                        const protocolPenyedia = req.protocol;
+                        const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
 
-                            if (!probeErr && probeStdout && probeStdout.trim().includes('x')) {
-                                const [w, h] = probeStdout.trim().split('x').map(Number);
-                                if (w && h) {
-                                    mediaWidth = w;
-                                    mediaHeight = h;
-                                }
-                            }
+                        global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl };
 
-                            console.log(`[DanzClean Probe] Dimensi terdeteksi (${isImage ? 'FOTO' : 'VIDEO'}): ${mediaWidth}x${mediaHeight}`);
-
-                            const domainPenyedia = req.get("host");
-                            const protocolPenyedia = req.protocol;
-                            const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
-
-                            global.videoProgress[videoId] = { status: "selesai", message: "Media HD Matang!", url: resultUrl };
-
-                            
-                            global.results.push({
-                                url: resultUrl,
-                                nomor: nomor,
-                                width: mediaWidth,
-                                height: mediaHeight,
-                                time: Date.now()
-                            });
-
-                            setTimeout(() => {
-                                if (fs.existsSync(normalized)) fs.unlink(normalized, () => {});
-                            }, 5 * 60 * 1000);
-
-                            resolve();
+                        global.results.push({
+                            url: resultUrl,
+                            nomor: nomor,
+                            time: Date.now()
                         });
+
+                        setTimeout(() => {
+                            if (fs.existsSync(normalized)) fs.unlink(normalized, () => {});
+                        }, 5 * 60 * 1000);
+
+                        resolve();
                     }
                 );
 
