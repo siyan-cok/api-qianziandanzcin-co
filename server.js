@@ -439,6 +439,8 @@ perintahFfmpeg = `ffmpeg \
 
                         const { width, height } = await dapatkanDimensiVideo(normalized);
 
+                        console.log(`[DIMENSI HASIL HD] nomor=${nomor} width=${width} height=${height} file=${outputFilename}`);
+
                         const domainPenyedia = req.get("host");
                         const protocolPenyedia = req.protocol;
                         const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
