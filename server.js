@@ -189,17 +189,36 @@ app.get("/debug", (req, res) => {
     })
 })
 //=======
-const dapatkanDurasiVideo = (filePath) => {
+const prosesFfmpeg = exec(
+                    perintahFfmpeg,
+                    { maxBuffer: 1024 * 1024 * 1024 }, 
+                    (err, stdout, stderr) => {
+                        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
+                        const sukses = fs.existsSync(normalized) && fs.statSync(normalized).size > 500 * 1024;
 
-    return new Promise((resolve, reject) => {
-        exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nocreval=1 "${filePath}"`, (err, stdout) => {
-            if (err) return resolve(30);
-            const durasi = parseFloat(stdout.trim());
-            resolve(isNaN(durasi) ? 30 : durasi);
-        });
-    });
-};
+                        if (err && !sukses) {
+                            const errorText = String(stderr || err.message || err);
+                            global.videoProgress[videoId] = {
+                                status: "error",
+                                message: "Video tidak dapat diproses oleh server."
+                            };
+
+                            sendTelegram(`❌ DanzClean Error\n\nNomor: ${nomor}\nFile: ${file.originalname}\nError:\n${errorText.slice(-1000)}`);
+                            return resolve();
+                        }
+
+                        const domainPenyedia = req.get("host");
+                        const protocolPenyedia = req.protocol;
+                        const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
+
+                        global.videoProgress[videoId] = { status: "selesai", message: "Video HD Matang!", url: resultUrl };
+
+                        global.results.push({
+                            url: resultUrl,
+                            nomor: nomor,
+                            time: Date.now()
+                        });
 
 app.post("/upload", upload.single("video"), async (req, res) => {
     const authHeader = req.headers.authorization;
@@ -405,7 +424,7 @@ perintahFfmpeg = `ffmpeg \
                 const prosesFfmpeg = exec(
                     perintahFfmpeg,
                     { maxBuffer: 1024 * 1024 * 1024 }, 
-                    (err, stdout, stderr) => {
+                    async (err, stdout, stderr) => {
                         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
                         const sukses = fs.existsSync(normalized) && fs.statSync(normalized).size > 500 * 1024;
@@ -421,6 +440,8 @@ perintahFfmpeg = `ffmpeg \
                             return resolve();
                         }
 
+                        const { width, height } = await dapatkanDimensiVideo(normalized);
+
                         const domainPenyedia = req.get("host");
                         const protocolPenyedia = req.protocol;
                         const resultUrl = `${protocolPenyedia}://${domainPenyedia}/video/${outputFilename}`;
@@ -430,7 +451,9 @@ perintahFfmpeg = `ffmpeg \
                         global.results.push({
                             url: resultUrl,
                             nomor: nomor,
-                            time: Date.now()
+                            time: Date.now(),
+                            width,
+                            height
                         });
 
                         setTimeout(() => {
